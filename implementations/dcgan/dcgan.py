@@ -11,8 +11,9 @@ from torchvision import datasets
 from torch.autograd import Variable
 
 import torch.nn as nn
-import torch.nn.functional as F
 import torch
+
+from wavelet_denoise2 import WaveletLayer2
 
 os.makedirs("images", exist_ok=True)
 
@@ -31,6 +32,8 @@ opt = parser.parse_args()
 print(opt)
 
 cuda = True if torch.cuda.is_available() else False
+# Macbook M1 GPU
+mac_m1 = True if torch.backends.mps.is_available() else False
 
 
 def weights_init_normal(m):
@@ -43,7 +46,7 @@ def weights_init_normal(m):
 
 
 class Generator(nn.Module):
-    def __init__(self):
+    def __init__(self, wavelet=None, wave_dropout=0.0):
         super(Generator, self).__init__()
 
         self.init_size = opt.img_size // 4
@@ -62,12 +65,19 @@ class Generator(nn.Module):
             nn.Conv2d(64, opt.channels, 3, stride=1, padding=1),
             nn.Tanh(),
         )
+        self.wavelet = wavelet
+        self.wave_dropout = wave_dropout
+        self.wavelet_layer = WaveletLayer2()
 
     def forward(self, z):
         out = self.l1(z)
         out = out.view(out.shape[0], 128, self.init_size, self.init_size)
         img = self.conv_blocks(out)
+        img = self.wavelet_layer(img)
         return img
+
+    def wavelet_loss(self):
+        return self.wavelet_layer.wavelet_loss()
 
 
 class Discriminator(nn.Module):
@@ -103,13 +113,29 @@ class Discriminator(nn.Module):
 adversarial_loss = torch.nn.BCELoss()
 
 # Initialize generator and discriminator
-generator = Generator()
+# random init
+# init_wavelet = ProductFilter(
+#     torch.rand(size=[6], requires_grad=True) / 2 - 0.25,
+#     torch.rand(size=[6], requires_grad=True) / 2 - 0.25,
+#     torch.rand(size=[6], requires_grad=True) / 2 - 0.25,
+#     torch.rand(size=[6], requires_grad=True) / 2 - 0.25,
+# )
+generator = Generator(
+    # wavelet=init_wavelet,
+    # wave_dropout=0.5
+)
 discriminator = Discriminator()
 
 if cuda:
     generator.cuda()
     discriminator.cuda()
     adversarial_loss.cuda()
+elif mac_m1:
+    # device = torch.device('mps')
+    # generator.to(device)
+    # discriminator.to(device)
+    # adversarial_loss.to(device)
+    print("Using mps by Macbook M1 GPU!")
 
 # Initialize weights
 generator.apply(weights_init_normal)
@@ -161,6 +187,7 @@ for epoch in range(opt.n_epochs):
 
         # Generate a batch of images
         gen_imgs = generator(z)
+        w_loss = generator.wavelet_loss()
 
         # Loss measures generator's ability to fool the discriminator
         g_loss = adversarial_loss(discriminator(gen_imgs), valid)
