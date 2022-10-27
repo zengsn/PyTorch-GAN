@@ -13,6 +13,7 @@ from torch.autograd import Variable
 import torch.nn as nn
 import torch
 
+from wavelet_denoise2 import get_wavelet
 from wavelet_denoise2 import WaveletLayer2
 
 os.makedirs("images", exist_ok=True)
@@ -66,18 +67,20 @@ class Generator(nn.Module):
             nn.Tanh(),
         )
         self.wavelet = wavelet
-        self.wave_dropout = wave_dropout
-        self.wavelet_layer = WaveletLayer2()
+        if wavelet is not None:
+            self.wave_dropout = wave_dropout
+            self.wavelet_layer = WaveletLayer2()
 
     def forward(self, z):
         out = self.l1(z)
         out = out.view(out.shape[0], 128, self.init_size, self.init_size)
         img = self.conv_blocks(out)
-        img = self.wavelet_layer(img)
+        if self.wavelet is not None:
+            img = self.wavelet_layer(img)
         return img
 
     def wavelet_loss(self):
-        return self.wavelet_layer.wavelet_loss()
+        return self.wavelet_layer.wavelet_loss() if self.wavelet is not None else None
 
 
 class Discriminator(nn.Module):
@@ -120,9 +123,9 @@ adversarial_loss = torch.nn.BCELoss()
 #     torch.rand(size=[6], requires_grad=True) / 2 - 0.25,
 #     torch.rand(size=[6], requires_grad=True) / 2 - 0.25,
 # )
+
 generator = Generator(
-    # wavelet=init_wavelet,
-    # wave_dropout=0.5
+    # wavelet=get_wavelet(78)
 )
 discriminator = Discriminator()
 

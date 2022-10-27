@@ -15,6 +15,13 @@ URL = 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/Zuse-Z4-Totale_
 
 # %matplotlib inline
 print(pywt.families())
+w_families = pywt.families()
+w_name_list = []
+for w_fname in w_families:
+    w_list = pywt.wavelist(w_fname)
+    w_name_list += w_list
+print(w_name_list)
+print(w_name_list.index('bior2.2'))
 
 w = pywt.Wavelet('bior2.2')
 plt.plot(w.dec_hi[::-1], label="dec hi")

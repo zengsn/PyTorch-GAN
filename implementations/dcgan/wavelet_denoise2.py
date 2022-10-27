@@ -6,6 +6,15 @@ from torch.nn.parameter import Parameter
 import pywt  # based on PyWavelets
 
 
+def get_wavelet(i):
+    w_families = pywt.families()
+    w_name_list = []
+    for w_name in w_families:
+        w_list = pywt.wavelist(w_name)
+        w_name_list += w_list
+    return w_name_list[i]
+
+
 class WaveletLayer2(torch.nn.Module):
     """
     Create a learn-able 2D Wavelet layer as described here:
