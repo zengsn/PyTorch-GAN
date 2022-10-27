@@ -29,11 +29,15 @@ class WaveletLayer2(torch.nn.Module):
         print("Wavelet 2D transformation using:", wavelet_name)
         self.wavelet_name = wavelet_name
         self.wavelet = pywt.Wavelet(wavelet_name)
+        self.cuda = True if torch.cuda.is_available() else False
 
-    def filters(self):
+    def filters(self, device):
         w = self.wavelet
         dec_hi = torch.tensor(w.dec_hi[::-1])
         dec_lo = torch.tensor(w.dec_lo[::-1])
+        if self.cuda:
+            dec_hi = torch.cuda.FloatTensor(w.dec_hi[::-1])
+            dec_lo = torch.cuda.FloatTensor(w.dec_lo[::-1])
         return torch.stack([
             dec_lo.unsqueeze(0) * dec_lo.unsqueeze(1),
             dec_lo.unsqueeze(0) * dec_hi.unsqueeze(1),
@@ -56,6 +60,9 @@ class WaveletLayer2(torch.nn.Module):
         w = self.wavelet
         rec_hi = torch.tensor(w.rec_hi)
         rec_lo = torch.tensor(w.rec_lo)
+        if self.cuda:
+            rec_hi = torch.cuda.FloatTensor(w.rec_hi)
+            rec_lo = torch.cuda.FloatTensor(w.rec_lo)
         return torch.stack([
             rec_lo.unsqueeze(0) * rec_lo.unsqueeze(1),
             rec_lo.unsqueeze(0) * rec_hi.unsqueeze(1),
