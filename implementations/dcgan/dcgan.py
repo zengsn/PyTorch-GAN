@@ -32,9 +32,14 @@ parser.add_argument("--sample_interval", type=int, default=400, help="interval b
 opt = parser.parse_args()
 print(opt)
 
+# Support different device
+device = torch.device('cpu')  # default
 cuda = True if torch.cuda.is_available() else False
-# Macbook M1 GPU
 mac_m1 = True if torch.backends.mps.is_available() else False
+if cuda:
+    device = torch.device('cuda:0')
+elif mac_m1: # Macbook M1 GPU
+    device = torch.device('mps')
 
 
 def weights_init_normal(m):
@@ -125,7 +130,7 @@ adversarial_loss = torch.nn.BCELoss()
 # )
 
 generator = Generator(
-    # wavelet=get_wavelet(78)
+    wavelet=get_wavelet(78)
 )
 discriminator = Discriminator()
 
@@ -133,11 +138,11 @@ if cuda:
     generator.cuda()
     discriminator.cuda()
     adversarial_loss.cuda()
+    print("Using CUDA GPU!")
 elif mac_m1:
-    # device = torch.device('mps')
-    # generator.to(device)
-    # discriminator.to(device)
-    # adversarial_loss.to(device)
+    generator.to(device)
+    discriminator.to(device)
+    adversarial_loss.to(device)
     print("Using mps by Macbook M1 GPU!")
 
 # Initialize weights
@@ -163,7 +168,7 @@ dataloader = torch.utils.data.DataLoader(
 optimizer_G = torch.optim.Adam(generator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2))
 optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=opt.lr, betas=(opt.b1, opt.b2))
 
-Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
+# Tensor = torch.cuda.FloatTensor if cuda else torch.FloatTensor
 
 # ----------
 #  Training
@@ -173,11 +178,16 @@ for epoch in range(opt.n_epochs):
     for i, (imgs, _) in enumerate(dataloader):
 
         # Adversarial ground truths
-        valid = Variable(Tensor(imgs.shape[0], 1).fill_(1.0), requires_grad=False)
-        fake = Variable(Tensor(imgs.shape[0], 1).fill_(0.0), requires_grad=False)
+        # valid = Variable(Tensor(imgs.shape[0], 1).fill_(1.0), requires_grad=False)
+        # fake = Variable(Tensor(imgs.shape[0], 1).fill_(0.0), requires_grad=False)
+        # if cpu or cuda or mac_m1:
+        valid =Variable(torch.ones((imgs.shape[0],1), device=device, requires_grad=False))
+        fake =Variable(torch.zeros((imgs.shape[0],1), device=device, requires_grad=False))
 
         # Configure input
-        real_imgs = Variable(imgs.type(Tensor))
+        # real_imgs = Variable(imgs.type(Tensor))
+        # if cpu or cuda or mac_m1:
+        real_imgs = Variable(torch.tensor(imgs, device=device))
 
         # -----------------
         #  Train Generator
@@ -186,14 +196,18 @@ for epoch in range(opt.n_epochs):
         optimizer_G.zero_grad()
 
         # Sample noise as generator input
-        z = Variable(Tensor(np.random.normal(0, 1, (imgs.shape[0], opt.latent_dim))))
+        # z = Variable(Tensor(np.random.normal(0, 1, (imgs.shape[0], opt.latent_dim))))
+        # if cpu or cuda or mac_m1:
+        arr_int32 = np.random.normal(0, 1, (imgs.shape[0], opt.latent_dim)).astype(np.float32)
+        z = Variable(torch.tensor(arr_int32, device=device))  # float32
 
         # Generate a batch of images
         gen_imgs = generator(z)
         w_loss = generator.wavelet_loss()
 
         # Loss measures generator's ability to fool the discriminator
-        g_loss = adversarial_loss(discriminator(gen_imgs), valid)
+        g_disc = discriminator(gen_imgs)
+        g_loss = adversarial_loss(g_disc, valid)
 
         g_loss.backward()
         optimizer_G.step()
@@ -205,8 +219,10 @@ for epoch in range(opt.n_epochs):
         optimizer_D.zero_grad()
 
         # Measure discriminator's ability to classify real from generated samples
-        real_loss = adversarial_loss(discriminator(real_imgs), valid)
-        fake_loss = adversarial_loss(discriminator(gen_imgs.detach()), fake)
+        real_disc = discriminator(real_imgs)
+        real_loss = adversarial_loss(real_disc, valid)
+        fake_disc = discriminator(gen_imgs.detach())
+        fake_loss = adversarial_loss(fake_disc, fake)
         d_loss = (real_loss + fake_loss) / 2
 
         d_loss.backward()

@@ -29,15 +29,18 @@ class WaveletLayer2(torch.nn.Module):
         print("Wavelet 2D transformation using:", wavelet_name)
         self.wavelet_name = wavelet_name
         self.wavelet = pywt.Wavelet(wavelet_name)
+        self.use_device = torch.device('cpu')  # default
         self.cuda = True if torch.cuda.is_available() else False
-
-    def filters(self, device):
-        w = self.wavelet
-        dec_hi = torch.tensor(w.dec_hi[::-1])
-        dec_lo = torch.tensor(w.dec_lo[::-1])
         if self.cuda:
-            dec_hi = torch.cuda.FloatTensor(w.dec_hi[::-1])
-            dec_lo = torch.cuda.FloatTensor(w.dec_lo[::-1])
+            self.use_device = torch.device('cuda:0')
+        self.mps = True if torch.backends.mps.is_available() else False
+        if self.mps:
+            self.use_device = torch.device('mps')
+
+    def filters(self):
+        w = self.wavelet
+        dec_hi = torch.tensor(w.dec_hi[::-1], device=self.use_device)
+        dec_lo = torch.tensor(w.dec_lo[::-1], device=self.use_device)
         return torch.stack([
             dec_lo.unsqueeze(0) * dec_lo.unsqueeze(1),
             dec_lo.unsqueeze(0) * dec_hi.unsqueeze(1),
@@ -58,11 +61,8 @@ class WaveletLayer2(torch.nn.Module):
 
     def inv_filters(self):
         w = self.wavelet
-        rec_hi = torch.tensor(w.rec_hi)
-        rec_lo = torch.tensor(w.rec_lo)
-        if self.cuda:
-            rec_hi = torch.cuda.FloatTensor(w.rec_hi)
-            rec_lo = torch.cuda.FloatTensor(w.rec_lo)
+        rec_hi = torch.tensor(w.rec_hi, device=self.use_device)
+        rec_lo = torch.tensor(w.rec_lo, device=self.use_device)
         return torch.stack([
             rec_lo.unsqueeze(0) * rec_lo.unsqueeze(1),
             rec_lo.unsqueeze(0) * rec_hi.unsqueeze(1),
