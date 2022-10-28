@@ -81,7 +81,12 @@ class Generator(nn.Module):
         out = out.view(out.shape[0], 128, self.init_size, self.init_size)
         img = self.conv_blocks(out)
         if self.wavelet is not None:
-            img = self.wavelet_layer(img)
+            img0 = img
+            img1 = self.wavelet_layer(img0)
+            # img = img1.subtract(img0)
+            # img = img1.add(img0)
+            # img[img > 255] = 255
+            img = img0 - 0.01*img1
         return img
 
     def wavelet_loss(self):
@@ -130,7 +135,7 @@ adversarial_loss = torch.nn.BCELoss()
 # )
 
 generator = Generator(
-    wavelet=get_wavelet(78)
+    # wavelet=get_wavelet(78)
 )
 discriminator = Discriminator()
 
@@ -203,7 +208,7 @@ for epoch in range(opt.n_epochs):
 
         # Generate a batch of images
         gen_imgs = generator(z)
-        w_loss = generator.wavelet_loss()
+        # w_loss = generator.wavelet_loss()
 
         # Loss measures generator's ability to fool the discriminator
         g_disc = discriminator(gen_imgs)
