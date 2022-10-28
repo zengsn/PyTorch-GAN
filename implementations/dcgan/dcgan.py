@@ -135,7 +135,7 @@ adversarial_loss = torch.nn.BCELoss()
 # )
 
 generator = Generator(
-    # wavelet=get_wavelet(78)
+    wavelet=get_wavelet(78)
 )
 discriminator = Discriminator()
 
