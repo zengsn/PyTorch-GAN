@@ -240,4 +240,5 @@ for epoch in range(opt.n_epochs):
 
         batches_done = epoch * len(dataloader) + i
         if batches_done % opt.sample_interval == 0:
-            save_image(gen_imgs.data[:25], "images/%d.png" % batches_done, nrow=5, normalize=True)
+            image_name = "images/%d.png" if generator.wavelet is None else "images/%d-w.png"
+            save_image(gen_imgs.data[:25], image_name % batches_done, nrow=5, normalize=True)
